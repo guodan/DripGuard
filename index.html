@@ -68,10 +68,12 @@
   .cd-sub{text-align:center;color:var(--txt-dim);font-size:13px;margin-bottom:12px;}
   .bottle-wrap{display:flex;justify-content:center;margin-top:2px;}
   .bottle{overflow:visible;}
-  #liquid{transition:y .9s linear, height .9s linear, fill .4s;}
-  #liquidTop{transition:y .9s linear, opacity .4s;}
+  /* 液面用 transform 缩放/平移，全平台（含 iOS Safari）均可平滑动画 */
+  #liquid{transform-box:fill-box;transform-origin:50% 100%;transition:transform .9s linear, fill .4s;}
+  #liquidTop{transform-box:fill-box;transform-origin:50% 100%;transition:transform .9s linear, opacity .4s;}
   .bottle .cap{fill:#2c2c33;}
   .bottle .outline{fill:none;stroke:#3a3a45;stroke-width:3;}
+  .bottle .neck{fill:none;stroke:#3a3a45;stroke-width:3;}
   @keyframes ctaPulse{0%,100%{box-shadow:0 6px 18px rgba(38,198,218,.25);}50%{box-shadow:0 6px 26px rgba(38,198,218,.6);}}
   .bigbtn.start-cta{animation:ctaPulse 1.8s ease-in-out infinite;}
 
@@ -192,23 +194,24 @@
     <div class="cd-time" id="cdTime">--<small>分</small></div>
     <div class="cd-sub" id="cdSub">—</div>
     <div class="bottle-wrap">
-      <svg class="bottle" id="bottle" width="120" height="180" viewBox="0 0 120 180">
+      <svg class="bottle" id="bottle" width="120" height="190" viewBox="0 0 120 190">
         <defs>
           <clipPath id="bottleClip">
-            <rect x="30" y="32" width="60" height="132" rx="18"/>
-            <rect x="53" y="16" width="14" height="20"/>
+            <rect x="30" y="20" width="60" height="130" rx="22"/>
+            <rect x="53" y="146" width="14" height="22"/>
           </clipPath>
         </defs>
-        <!-- 液体（裁剪到瓶内，液面随进度下降） -->
+        <!-- 液体（裁剪到瓶内；倒置瓶口朝下，药液从底部排空，液面自上而下降） -->
         <g clip-path="url(#bottleClip)">
-          <rect id="liquid" x="26" y="164" width="68" height="0" fill="#26c6da"/>
-          <rect id="liquidTop" x="26" y="160" width="68" height="6" fill="#b2ebf2" opacity="0.5"/>
+          <rect id="liquid" x="26" y="20" width="68" height="148" fill="#26c6da"/>
+          <rect id="liquidTop" x="26" y="20" width="68" height="5" fill="#b2ebf2" opacity="0"/>
         </g>
-        <!-- 瓶身描边 -->
-        <rect class="outline" x="30" y="32" width="60" height="132" rx="18"/>
-        <rect class="outline" x="53" y="16" width="14" height="20"/>
-        <!-- 瓶盖 -->
-        <rect class="cap" x="49" y="6" width="22" height="12" rx="3"/>
+        <!-- 瓶身描边：圆顶在上、瓶颈与瓶盖在下（倒置悬挂） -->
+        <rect class="outline" x="30" y="20" width="60" height="130" rx="22"/>
+        <rect class="neck" x="53" y="146" width="14" height="22"/>
+        <rect class="cap" x="49" y="166" width="22" height="14" rx="3"/>
+        <!-- 滴注出口小标记 -->
+        <circle cx="60" cy="184" r="3" fill="#26c6da"/>
       </svg>
     </div>
   </div>
@@ -296,7 +299,7 @@
   "use strict";
   const $ = (id)=>document.getElementById(id);
   const STORE = "dripguard_state_v1";
-  const BOTTLE_BOTTOM = 164, BOTTLE_TOP = 16, BOTTLE_INNER = BOTTLE_BOTTOM - BOTTLE_TOP;
+  const BOTTLE_TRAVEL = 148; // 液面可移动的总距离（满→空，单位:SVG用户坐标）
 
   // ---------- 状态 ----------
   let state = {
@@ -478,19 +481,16 @@
     }
   }
   function setBottle(p){
-    const fillH = BOTTLE_INNER*(1-p);
-    const y = BOTTLE_BOTTOM - fillH;
+    p = Math.max(0, Math.min(1, p));
+    const fillRatio = 1 - p;            // 1=满, 0=空
     const liq=$("liquid");
-    liq.style.y = y+"px"; liq.setAttribute("y", y);
-    liq.style.height = fillH+"px"; liq.setAttribute("height", fillH);
+    // 缩放底部锚定的液面：满时 scaleY(1) 充满，空时 scaleY(0) 收到底部出口
+    liq.style.transform = "scaleY("+fillRatio+")";
+    liq.style.fill = p>=1 ? "var(--ok)" : (p>0.85 ? "var(--warn)" : "var(--accent)");
+    // 液面高亮随液面同步下移
     const top2=$("liquidTop");
-    const ty = Math.max(BOTTLE_TOP, y-3);
-    top2.style.y = ty+"px"; top2.setAttribute("y", ty);
-    top2.style.opacity = fillH>2 ? "0.55" : "0";
-    let col = "var(--accent)";
-    if(p>=1) col="var(--ok)";
-    else if(p>0.85) col="var(--warn)";
-    liq.style.fill = col;
+    top2.style.transform = "translateY("+(p*BOTTLE_TRAVEL)+"px)";
+    top2.style.opacity = fillRatio>0.02 ? "0.6" : "0";
   }
   setInterval(tick, 1000);
 
@@ -566,10 +566,16 @@
   refreshSteps();
   if(state.T0 && state.R && state.Tend){ tick(); if(state.keepAlive) startKeepAlive(); }
 
-  // 注册 Service Worker
+  // 注册 Service Worker（网络优先策略，确保始终拉取最新版本）
   if("serviceWorker" in navigator){
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", ()=>{
+      if(refreshing) return;          // 新版本生效时自动刷新一次，避免手动双刷新
+      refreshing = true;
+      window.location.reload();
+    });
     window.addEventListener("load",()=>{
-      navigator.serviceWorker.register("./sw.js").catch(()=>{});
+      navigator.serviceWorker.register("./sw.js", {updateViaCache:"none"}).catch(()=>{});
     });
   }
 })();
