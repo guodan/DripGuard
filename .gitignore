@@ -1,0 +1,10 @@
+# WorkBuddy 内部项目数据（非应用文件）
+.workbuddy/
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db
+*.log
+
+# 临时校验产物
+_check.js

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#121212" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="滴速守卫" />
+<title>滴速守卫 · 输液助手</title>
+<link rel="manifest" href="./manifest.json" />
+<link rel="icon" type="image/svg+xml" href="./icon.svg" />
+<link rel="apple-touch-icon" href="./icon.svg" />
+<style>
+  :root{
+    --bg:#121212;
+    --bg-soft:#1b1b1f;
+    --bg-card:#1e1e23;
+    --line:#2c2c33;
+    --txt:#e8e8ea;
+    --txt-dim:#9a9aa2;
+    --accent:#26c6da;
+    --accent-soft:#b2ebf2;
+    --warn:#ffb74d;
+    --danger:#ef5350;
+    --ok:#66bb6a;
+    --radius:18px;
+    --shadow:0 8px 30px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    min-height:100vh;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .wrap{max-width:520px;margin:0 auto;padding:20px 16px 48px;}
+  header{text-align:center;margin-bottom:18px;}
+  header h1{font-size:22px;margin:0;letter-spacing:2px;font-weight:700;}
+  header h1 .drop{color:var(--accent);}
+  header p{margin:4px 0 0;color:var(--txt-dim);font-size:13px;letter-spacing:1px;}
+
+  /* 倒计时卡片（吸顶） */
+  .countdown{
+    position:sticky;top:8px;z-index:20;
+    background:linear-gradient(160deg,#1e2a2d,#16181b);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:18px 16px;
+    box-shadow:var(--shadow);
+    display:none;
+    margin-bottom:20px;
+  }
+  .countdown.show{display:block;}
+  .cd-top{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .cd-end{font-size:13px;color:var(--txt-dim);}
+  .cd-end b{color:var(--accent-soft);font-size:18px;font-weight:700;letter-spacing:1px;}
+  .cd-status{font-size:12px;color:var(--txt-dim);text-align:right;max-width:50%;}
+  .cd-status.alarm{color:var(--warn);font-weight:700;}
+  .cd-status.done{color:var(--ok);font-weight:700;}
+  .cd-time{font-size:46px;font-weight:800;letter-spacing:1px;text-align:center;margin:10px 0 4px;font-variant-numeric:tabular-nums;}
+  .cd-time small{font-size:18px;font-weight:600;color:var(--txt-dim);margin-left:4px;}
+  .cd-sub{text-align:center;color:var(--txt-dim);font-size:13px;margin-bottom:12px;}
+  .ring-wrap{display:flex;justify-content:center;}
+  .ring{transform:rotate(-90deg);}
+  .ring .bg{fill:none;stroke:#2c2c33;stroke-width:10;}
+  .ring .fg{fill:none;stroke:var(--accent);stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset .9s linear,stroke .4s;}
+
+  /* 步骤卡片 */
+  .step{
+    background:var(--bg-card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:18px 16px;
+    margin-bottom:16px;
+    opacity:.45;
+    filter:grayscale(.4);
+    transition:opacity .35s,filter .35s,border-color .35s;
+  }
+  .step.active{opacity:1;filter:none;border-color:#3a3a45;}
+  .step .num{
+    display:inline-flex;width:24px;height:24px;border-radius:50%;
+    background:var(--bg-soft);color:var(--accent);font-size:13px;font-weight:700;
+    align-items:center;justify-content:center;margin-right:8px;border:1px solid var(--line);
+  }
+  .step h2{font-size:15px;margin:0 0 12px;display:flex;align-items:center;font-weight:600;}
+  .step .done-tag{margin-left:auto;font-size:12px;color:var(--ok);display:none;}
+  .step.finished .done-tag{display:inline;}
+
+  .bigbtn{
+    width:100%;border:none;border-radius:14px;padding:20px;
+    background:linear-gradient(135deg,var(--accent),#1aa6b8);
+    color:#06222a;font-size:18px;font-weight:800;letter-spacing:2px;
+    cursor:pointer;box-shadow:0 6px 18px rgba(38,198,218,.25);
+    transition:transform .12s,box-shadow .2s;
+  }
+  .bigbtn:active{transform:scale(.97);}
+  .bigbtn.ghost{background:var(--bg-soft);color:var(--txt);box-shadow:none;border:1px solid var(--line);}
+
+  .hint{color:var(--txt-dim);font-size:12.5px;margin-top:10px;text-align:center;}
+
+  /* 分段控件 */
+  .seg{display:flex;gap:8px;flex-wrap:wrap;}
+  .seg button{
+    flex:1;min-width:64px;border:1px solid var(--line);background:var(--bg-soft);
+    color:var(--txt);padding:12px 6px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;
+    transition:all .18s;
+  }
+  .seg button.on{background:var(--accent);color:#06222a;border-color:var(--accent);}
+  .custom-in{margin-top:10px;display:none;}
+  .custom-in.show{display:block;}
+  .custom-in input{
+    width:100%;background:var(--bg);border:1px solid var(--line);color:var(--txt);
+    border-radius:12px;padding:12px;font-size:16px;outline:none;
+  }
+  .custom-in input:focus{border-color:var(--accent);}
+
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;}
+  .row .label{font-size:13px;color:var(--txt-dim);}
+  .toggle{cursor:pointer;}
+  .collapse-head{margin-top:14px;color:var(--txt-dim);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;}
+  .collapse-head .arr{transition:transform .25s;}
+  .collapse-head.open .arr{transform:rotate(90deg);}
+  .collapse-body{display:none;margin-top:10px;}
+  .collapse-body.show{display:block;}
+
+  .mini-seg{display:flex;gap:8px;}
+  .mini-seg button{
+    border:1px solid var(--line);background:var(--bg-soft);color:var(--txt);
+    padding:8px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;
+  }
+  .mini-seg button.on{background:var(--accent);color:#06222a;border-color:var(--accent);}
+
+  /* Tap 区域 */
+  .tap-zone{
+    margin-top:6px;border:2px dashed #3a4a4d;border-radius:16px;
+    background:radial-gradient(circle at 50% 40%,#16282b,#141517);
+    height:200px;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;color:var(--accent-soft);font-size:15px;text-align:center;
+    position:relative;overflow:hidden;cursor:pointer;user-select:none;touch-action:manipulation;
+  }
+  .tap-zone .count{font-size:40px;font-weight:800;color:var(--accent);line-height:1.1;}
+  .tap-zone .tip{color:var(--txt-dim);font-size:13px;margin-top:6px;padding:0 16px;}
+  .ripple{position:absolute;border-radius:50%;background:rgba(38,198,218,.35);transform:translate(-50%,-50%) scale(0);pointer-events:none;animation:rip .6s ease-out;}
+  @keyframes rip{to{transform:translate(-50%,-50%) scale(1);opacity:0;}}
+
+  .res-line{margin-top:12px;font-size:13px;color:var(--txt-dim);text-align:center;}
+  .res-line b{color:var(--accent-soft);font-size:15px;}
+
+  /* 开关 */
+  .switch{position:relative;width:48px;height:28px;flex:0 0 auto;}
+  .switch input{display:none;}
+  .switch .track{position:absolute;inset:0;background:#33333a;border-radius:999px;transition:background .2s;}
+  .switch .knob{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s;}
+  .switch input:checked + .track{background:var(--accent);}
+  .switch input:checked + .track + .knob{left:23px;}
+
+  .lead-in{width:72px;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:7px 8px;font-size:14px;text-align:center;outline:none;}
+
+  .footer{text-align:center;color:#5a5a62;font-size:11px;margin-top:24px;line-height:1.7;}
+  .toast{
+    position:fixed;left:50%;bottom:32px;transform:translateX(-50%) translateY(20px);
+    background:#2a2a30;color:#fff;padding:12px 18px;border-radius:12px;font-size:13px;
+    box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:all .3s;z-index:50;max-width:90%;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .pill{display:inline-block;background:var(--bg-soft);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px;color:var(--txt-dim);margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="drop">滴</span>速守卫</h1>
+    <p>输液助手 · 陪护必备</p>
+  </header>
+
+  <!-- 倒计时卡片 -->
+  <div class="countdown" id="card">
+    <div class="cd-top">
+      <div class="cd-end">预计 <b id="cdEnd">--:--</b> 滴完</div>
+      <div class="cd-status" id="cdStatus">计算中…</div>
+    </div>
+    <div class="cd-time" id="cdTime">--<small>分</small></div>
+    <div class="cd-sub" id="cdSub">—</div>
+    <div class="ring-wrap">
+      <svg class="ring" width="120" height="120" viewBox="0 0 120 120">
+        <circle class="bg" cx="60" cy="60" r="52"></circle>
+        <circle class="fg" id="ringFg" cx="60" cy="60" r="52"></circle>
+      </svg>
+    </div>
+  </div>
+
+  <!-- 步骤一 -->
+  <section class="step" id="step1">
+    <h2><span class="num">1</span>换药打卡<span class="done-tag">✓ 已记录</span></h2>
+    <button class="bigbtn" id="resetBtn">刚刚换药了</button>
+    <div class="hint" id="resetHint">点击记录本次换药的起始时间 T₀</div>
+  </section>
+
+  <!-- 步骤二 -->
+  <section class="step" id="step2">
+    <h2><span class="num">2</span>容量与滴系数</h2>
+    <div class="label" style="font-size:13px;color:var(--txt-dim);margin-bottom:8px;">标称液量</div>
+    <div class="seg" id="capSeg">
+      <button data-cap="100">100ml</button>
+      <button data-cap="250" class="on">250ml</button>
+      <button data-cap="500">500ml</button>
+      <button data-cap="custom">自定义</button>
+    </div>
+    <div class="custom-in" id="customCapWrap">
+      <input type="number" id="customCap" inputmode="decimal" placeholder="输入液量（ml），如 150" />
+    </div>
+
+    <div class="collapse-head" id="dropHead"><span class="arr">▸</span>滴系数微调（默认 15 滴/ml）</div>
+    <div class="collapse-body" id="dropBody">
+      <div class="mini-seg" id="dropSeg">
+        <button data-drop="15" class="on">15 滴/ml</button>
+        <button data-drop="20">20 滴/ml</button>
+        <button data-drop="custom">自定义</button>
+      </div>
+      <div class="custom-in show" id="customDropWrap" style="display:none;">
+        <input type="number" id="customDrop" inputmode="decimal" placeholder="自定义滴系数（滴/ml）" />
+      </div>
+    </div>
+  </section>
+
+  <!-- 步骤三 -->
+  <section class="step" id="step3">
+    <h2><span class="num">3</span>Tap 节拍采样</h2>
+    <div class="tap-zone" id="tapZone">
+      <div class="count" id="tapCount">0/5</div>
+      <div class="tip" id="tapTip">顺着药水滴落节奏，轻敲屏幕 5 下</div>
+    </div>
+    <div class="res-line" id="tapRes">尚未采样</div>
+    <div class="hint" id="tapHint">每敲一下会有涟漪与轻微震动，系统取 5 次间隔的平均值推算滴速。</div>
+  </section>
+
+  <!-- 步骤四：倒计时卡片已在顶部，这里放重新测速/重设 -->
+  <section class="step" id="step4">
+    <h2><span class="num">4</span>时间推算</h2>
+    <div class="res-line" id="calcRes">完成上方采样后自动推算。</div>
+    <button class="bigbtn ghost" id="reTapBtn" style="margin-top:12px;display:none;">重新测速（再敲 5 下）</button>
+  </section>
+
+  <!-- 步骤五 -->
+  <section class="step" id="step5">
+    <h2><span class="num">5</span>警报与保活</h2>
+    <div class="row">
+      <div class="label">提前提醒（分钟）</div>
+      <input class="lead-in" id="leadInput" type="number" inputmode="numeric" value="5" min="0" max="60" />
+    </div>
+    <div class="row">
+      <div class="label">后台保活（防锁屏休眠）<br><span style="font-size:11px;">循环静音音频保持计时器活跃</span></div>
+      <label class="switch">
+        <input type="checkbox" id="keepAlive" />
+        <span class="track"></span><span class="knob"></span>
+      </label>
+    </div>
+    <button class="bigbtn ghost" id="restartBtn" style="margin-top:14px;">重新换药 / 归零</button>
+    <div class="hint">开启保活后，切到后台或锁屏也能按时响铃提醒。</div>
+  </section>
+
+  <div class="footer">
+    滴速守卫 Drip Guard · 纯前端 PWA<br>
+    仅作陪护参考，实际以医护人员判断为准
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  const $ = (id)=>document.getElementById(id);
+  const STORE = "dripguard_state_v1";
+  const RING_R = 52, RING_C = 2*Math.PI*RING_R;
+  $("ringFg").style.strokeDasharray = RING_C;
+
+  // ---------- 状态 ----------
+  let state = {
+    T0:null,            // 换药时间戳
+    capacity:250,       // 标称液量 ml
+    capCustom:null,     // 自定义液量
+    drop:15,            // 滴系数 gtt/ml
+    dropCustom:null,    // 自定义滴系数
+    R:null,             // 滴速 滴/分钟
+    Tend:null,          // 预计滴完时间戳
+    leadMin:5,          // 提前提醒分钟
+    leadAlerted:false,  // 提前提醒已触发
+    keepAlive:false
+  };
+
+  function save(){ try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){} }
+  function load(){
+    try{
+      const s = JSON.parse(localStorage.getItem(STORE));
+      if(s) state = Object.assign(state, s);
+    }catch(e){}
+  }
+
+  function vibrate(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }
+
+  function toast(msg){
+    const t=$("toast"); t.textContent=msg; t.classList.add("show");
+    clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2200);
+  }
+
+  // ---------- 步骤可见性 ----------
+  function refreshSteps(){
+    const s1=$("step1"), s2=$("step2"), s3=$("step3"), s4=$("step4"), s5=$("step5");
+    if(state.T0){ s1.classList.add("active","finished"); $("resetHint").textContent="已记下换药时间："+fmtClock(state.T0); }
+    if(state.T0){ s2.classList.add("active"); }
+    if(state.T0){ s3.classList.add("active"); }
+    if(state.R){ s4.classList.add("active","finished"); s5.classList.add("active"); $("reTapBtn").style.display=""; }
+    if(state.Tend){ $("card").classList.add("show"); }
+  }
+
+  function fmtClock(ts){ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+  function fmtDur(ms){
+    if(ms<=0) return {m:0,s:0};
+    const sec=Math.round(ms/1000); return {m:Math.floor(sec/60), s:sec%60};
+  }
+
+  // ---------- 步骤一：换药打卡 ----------
+  $("resetBtn").addEventListener("click", ()=>{
+    state.T0 = Date.now();
+    state.Tend = null; state.R=null; state.leadAlerted=false;
+    tapTimestamps = []; updateTapUI();
+    save(); refreshSteps(); recompute(); toast("已记录换药时间 "+fmtClock(state.T0));
+  });
+
+  // ---------- 步骤二：容量 / 滴系数 ----------
+  $("capSeg").addEventListener("click",(e)=>{
+    const b=e.target.closest("button"); if(!b) return;
+    [...$("capSeg").children].forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");
+    const v=b.dataset.cap;
+    if(v==="custom"){ $("customCapWrap").classList.add("show"); }
+    else { $("customCapWrap").classList.remove("show"); state.capacity=Number(v); state.capCustom=null; recompute(); }
+  });
+  $("customCap").addEventListener("input",(e)=>{
+    const v=parseFloat(e.target.value);
+    if(v>0){ state.capCustom=v; state.capacity=v; recompute(); }
+  });
+
+  $("dropHead").addEventListener("click",()=>{
+    $("dropHead").classList.toggle("open");
+    $("dropBody").classList.toggle("show");
+  });
+  $("dropSeg").addEventListener("click",(e)=>{
+    const b=e.target.closest("button"); if(!b) return;
+    [...$("dropSeg").children].forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");
+    const v=b.dataset.drop;
+    if(v==="custom"){ $("customDropWrap").style.display="block"; }
+    else { $("customDropWrap").style.display="none"; state.drop=Number(v); state.dropCustom=null; recompute(); }
+  });
+  $("customDrop").addEventListener("input",(e)=>{
+    const v=parseFloat(e.target.value);
+    if(v>0){ state.dropCustom=v; state.drop=v; recompute(); }
+  });
+
+  // ---------- 步骤三：Tap 节拍 ----------
+  let tapTimestamps = [];
+  function updateTapUI(){
+    $("tapCount").textContent = tapTimestamps.length+"/5";
+  }
+  function handleTap(clientX, clientY){
+    const now = Date.now();
+    tapTimestamps.push(now);
+    if(tapTimestamps.length>5) tapTimestamps.shift();
+    updateTapUI();
+    vibrate(25);
+    spawnRipple(clientX, clientY);
+    if(tapTimestamps.length>=5){
+      const intervals=[];
+      for(let i=1;i<tapTimestamps.length;i++) intervals.push(tapTimestamps[i]-tapTimestamps[i-1]);
+      const avgMs = intervals.reduce((a,b)=>a+b,0)/intervals.length;
+      const dropsPerMin = (60*1000)/avgMs;
+      // 合理性软提示
+      if(dropsPerMin>200 || dropsPerMin<5){
+        $("tapRes").innerHTML = "测得 <b>"+dropsPerMin.toFixed(0)+"</b> 滴/分，节奏似乎不太对，可点「重新测速」再敲一次。";
+      } else {
+        $("tapRes").innerHTML = "平均单滴间隔 <b>"+(avgMs/1000).toFixed(2)+"</b> 秒 · 滴速 <b>"+dropsPerMin.toFixed(0)+"</b> 滴/分";
+      }
+      state.R = dropsPerMin;
+      save(); refreshSteps(); recompute();
+    }
+  }
+  function spawnRipple(x,y){
+    const z=$("tapZone"); const r=document.createElement("span");
+    r.className="ripple";
+    const rect=z.getBoundingClientRect();
+    const px=(x!=null? x-rect.left : rect.width/2);
+    const py=(y!=null? y-rect.top : rect.height/2);
+    const size=Math.max(rect.width,rect.height)*0.9;
+    r.style.width=r.style.height=size+"px";
+    r.style.left=px+"px"; r.style.top=py+"px";
+    z.appendChild(r);
+    setTimeout(()=>r.remove(),650);
+  }
+  $("tapZone").addEventListener("pointerdown",(e)=>{ e.preventDefault(); handleTap(e.clientX,e.clientY); });
+  $("reTapBtn").addEventListener("click",()=>{ tapTimestamps=[]; updateTapUI(); $("tapRes").textContent="请重新轻敲 5 下"; state.R=null; state.Tend=null; state.leadAlerted=false; save(); refreshSteps(); });
+
+  // ---------- 推算 ----------
+  function recompute(){
+    const cap = state.capCustom || state.capacity;
+    const drop = state.dropCustom || state.drop;
+    if(state.T0 && state.R && cap>0 && drop>0){
+      const Ntotal = cap*drop;                 // 总滴数
+      const M = Ntotal/state.R;                // 总时长（分钟）
+      const now=Date.now();
+      state.Tend = state.T0 + M*60000;
+      // 若改动使时间推回到提醒窗口外，允许重新提醒
+      if((state.Tend-now) > state.leadMin*60000) state.leadAlerted=false;
+      $("calcRes").innerHTML = "总滴数 <b>"+Math.round(Ntotal)+"</b> 滴 · 预计总时长 <b>"+M.toFixed(1)+"</b> 分钟";
+      save(); refreshSteps(); tick();
+    } else if(state.T0 && state.R){
+      $("calcRes").textContent = "请先设置液量与滴系数。";
+    }
+  }
+
+  // ---------- 倒计时 ----------
+  function tick(){
+    if(!state.Tend){ return; }
+    const now=Date.now();
+    const remainMs = state.Tend - now;
+    const statusEl=$("cdStatus");
+    if(remainMs<=0){
+      $("cdTime").innerHTML = "0<small>分</small>";
+      $("cdSub").textContent = "输液应已滴完，请及时查看 / 换药。";
+      statusEl.textContent="已滴完"; statusEl.className="cd-status done";
+      setRing(1);
+      if(!state._finalDone){ state._finalDone=true; ring(); vibrate([200,100,200,100,200]); toast("滴完啦！请查看输液情况"); }
+      return;
+    }
+    const d=fmtDur(remainMs);
+    $("cdTime").innerHTML = d.m+"<small>分</small>";
+    $("cdSub").textContent = "还剩 "+d.m+" 分 "+(d.s>0?d.s+" 秒":"");
+    $("cdEnd").textContent = fmtClock(state.Tend);
+    const totalMs = state.Tend - state.T0;
+    const prog = totalMs>0 ? Math.min(1, (now-state.T0)/totalMs) : 0;
+    setRing(prog);
+    // 提前提醒
+    if(!state.leadAlerted && remainMs <= state.leadMin*60000){
+      state.leadAlerted=true; save();
+      statusEl.textContent="即将滴完"; statusEl.className="cd-status alarm";
+      ring(); vibrate([120,60,120]);
+      toast("还有约 "+Math.ceil(remainMs/60000)+" 分钟滴完，请留意");
+    } else if(remainMs > state.leadMin*60000){
+      statusEl.textContent="滴液中"; statusEl.className="cd-status";
+    }
+  }
+  function setRing(p){
+    $("ringFg").style.strokeDashoffset = RING_C*(1-p);
+    const ring=$("ringFg");
+    ring.style.stroke = (p>0.85)? "var(--warn)" : (p>=1? "var(--ok)":"var(--accent)");
+  }
+  setInterval(tick, 1000);
+
+  // ---------- Web Audio 响铃 ----------
+  function ring(){
+    try{
+      const Ctx = window.AudioContext||window.webkitAudioContext;
+      const ctx = new Ctx();
+      const beep=(t,f)=>{
+        const o=ctx.createOscillator(), g=ctx.createGain();
+        o.type="sine"; o.frequency.value=f;
+        o.connect(g); g.connect(ctx.destination);
+        g.gain.setValueAtTime(0.0001,t);
+        g.gain.exponentialRampToValueAtTime(0.5,t+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001,t+0.26);
+        o.start(t); o.stop(t+0.28);
+      };
+      const t0=ctx.currentTime;
+      beep(t0,880); beep(t0+0.34,880); beep(t0+0.68,988);
+      setTimeout(()=>{ try{ctx.close();}catch(e){} }, 1300);
+    }catch(e){}
+  }
+
+  // ---------- 步骤五：保活 ----------
+  let silentCtx=null, silentSrc=null;
+  function startKeepAlive(){
+    try{
+      if(!silentCtx){
+        const Ctx=window.AudioContext||window.webkitAudioContext;
+        silentCtx=new Ctx();
+        const buf=silentCtx.createBuffer(1,1,22050);
+        silentSrc=silentCtx.createBufferSource();
+        silentSrc.buffer=buf; silentSrc.loop=true;
+        silentSrc.connect(silentCtx.destination);
+      }
+      if(silentCtx.state==="suspended") silentCtx.resume();
+      silentSrc.start(0);
+    }catch(e){}
+  }
+  function stopKeepAlive(){
+    try{ if(silentSrc) silentSrc.stop(); }catch(e){}
+  }
+  $("keepAlive").addEventListener("change",(e)=>{
+    state.keepAlive=e.target.checked; save();
+    if(state.keepAlive){ startKeepAlive(); toast("后台保活已开启"); }
+    else { stopKeepAlive(); toast("后台保活已关闭"); }
+  });
+  $("leadInput").addEventListener("input",(e)=>{
+    const v=parseInt(e.target.value,10); state.leadMin=isNaN(v)?5:Math.max(0,Math.min(60,v)); state.leadAlerted=false; save();
+  });
+  $("restartBtn").addEventListener("click",()=>{
+    if(!confirm("确定要归零并重新换药吗？")) return;
+    state.T0=null; state.R=null; state.Tend=null; state.leadAlerted=false; state._finalDone=false;
+    tapTimestamps=[]; updateTapUI();
+    $("step1").classList.remove("finished"); $("step2").classList.remove("active","finished");
+    $("step3").classList.remove("active","finished"); $("step4").classList.remove("active","finished"); $("step5").classList.remove("active");
+    $("card").classList.remove("show"); $("resetHint").textContent="点击记录本次换药的起始时间 T₀";
+    $("tapRes").textContent="尚未采样"; $("calcRes").textContent="完成上方采样后自动推算。"; $("reTapBtn").style.display="none";
+    stopKeepAlive(); $("keepAlive").checked=false; state.keepAlive=false;
+    save();
+  });
+
+  // ---------- 启动 ----------
+  load();
+  // 还原 UI 选择
+  if(state.capCustom!=null){ [...$("capSeg").children].forEach(x=>x.classList.toggle("on",x.dataset.cap==="custom")); $("customCapWrap").classList.add("show"); $("customCap").value=state.capCustom; }
+  else { [...$("capSeg").children].forEach(x=>x.classList.toggle("on", Number(x.dataset.cap)===state.capacity)); }
+  if(state.dropCustom!=null){ [...$("dropSeg").children].forEach(x=>x.classList.toggle("on",x.dataset.drop==="custom")); $("customDropWrap").style.display="block"; $("customDrop").value=state.dropCustom; }
+  else { [...$("dropSeg").children].forEach(x=>x.classList.toggle("on", Number(x.dataset.drop)===state.drop)); }
+  $("leadInput").value = state.leadMin;
+  $("keepAlive").checked = !!state.keepAlive;
+  if(state.T0 && state.R){ $("tapRes").innerHTML="已恢复上次滴速 <b>"+state.R.toFixed(0)+"</b> 滴/分（可重新测速）"; }
+  refreshSteps();
+  if(state.T0 && state.R && state.Tend){ tick(); if(state.keepAlive) startKeepAlive(); }
+
+  // 注册 Service Worker
+  if("serviceWorker" in navigator){
+    window.addEventListener("load",()=>{
+      navigator.serviceWorker.register("./sw.js").catch(()=>{});
+    });
+  }
+})();
+</script>
+</body>
+</html>
