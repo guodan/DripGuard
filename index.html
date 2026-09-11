@@ -338,7 +338,14 @@
     if(state.T0){ s2.classList.add("active"); }
     if(state.T0){ s3.classList.add("active"); }
     if(state.R){ s4.classList.add("active","finished"); s5.classList.add("active"); $("reTapBtn").style.display=""; }
-    if(state.Tend){ $("card").classList.add("show"); }
+    if(state.T0){ $("card").classList.add("show"); }                  // 一换药即显示瓶子（满瓶）
+    if(state.T0 && !state.Tend){                                      // 测算中：瓶子满，等待节拍与容量
+      $("cdTime").innerHTML="测算中";
+      $("cdSub").textContent="轻敲屏幕测滴速，并选好液量";
+      $("cdEnd").textContent="—";
+      const se=$("cdStatus"); se.textContent="等待测速"; se.className="cd-status";
+      setBottle(0);
+    }
     // 开始计时按钮在尚未换药时持续高亮脉冲
     if(!state.T0){ $("resetBtn").classList.add("start-cta"); }
     else { $("resetBtn").classList.remove("start-cta"); }
@@ -355,7 +362,7 @@
     state.T0 = Date.now();
     state.Tend = null; state.R=null; state.leadAlerted=false;
     tapTimestamps = []; updateTapUI();
-    save(); refreshSteps(); recompute(); toast("已记录换药时间 "+fmtClock(state.T0));
+    save(); refreshSteps(); recompute(); fillBottle(); toast("已记录换药时间 "+fmtClock(state.T0));
   });
 
   // ---------- 步骤二：容量 / 滴系数 ----------
@@ -451,10 +458,18 @@
 
   // ---------- 倒计时 ----------
   function tick(){
-    if(!state.Tend){ return; }
     const now=Date.now();
-    const remainMs = state.Tend - now;
     const statusEl=$("cdStatus");
+    if(!state.Tend){
+      if(state.T0){                                                   // 测算中：瓶子保持满，等待节拍与容量
+        $("cdTime").innerHTML="测算中";
+        $("cdSub").textContent="轻敲屏幕测滴速，并选好液量";
+        $("cdEnd").textContent="—";
+        statusEl.textContent="等待测速"; statusEl.className="cd-status";
+      }
+      return;
+    }
+    const remainMs = state.Tend - now;
     if(remainMs<=0){
       $("cdTime").innerHTML = "0<small>分</small>";
       $("cdSub").textContent = "输液应已滴完，请及时查看 / 换药。";
@@ -491,6 +506,14 @@
     const top2=$("liquidTop");
     top2.style.transform = "translateY("+(p*BOTTLE_TRAVEL)+"px)";
     top2.style.opacity = fillRatio>0.02 ? "0.6" : "0";
+  }
+  function fillBottle(){              // 刚换药：瓶子自底向上充满（仅用户点击时播放动画）
+    const liq=$("liquid");
+    liq.style.transition="none";
+    liq.style.transform="scaleY(0)";
+    void liq.getBoundingClientRect(); // 强制回流，使下一帧从空开始
+    liq.style.transition="";          // 恢复 CSS .9s 过渡
+    setBottle(0);                     // → scaleY(1) 触发填充动画
   }
   setInterval(tick, 1000);
 
