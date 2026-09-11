@@ -66,10 +66,14 @@
   .cd-time{font-size:46px;font-weight:800;letter-spacing:1px;text-align:center;margin:10px 0 4px;font-variant-numeric:tabular-nums;}
   .cd-time small{font-size:18px;font-weight:600;color:var(--txt-dim);margin-left:4px;}
   .cd-sub{text-align:center;color:var(--txt-dim);font-size:13px;margin-bottom:12px;}
-  .ring-wrap{display:flex;justify-content:center;}
-  .ring{transform:rotate(-90deg);}
-  .ring .bg{fill:none;stroke:#2c2c33;stroke-width:10;}
-  .ring .fg{fill:none;stroke:var(--accent);stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset .9s linear,stroke .4s;}
+  .bottle-wrap{display:flex;justify-content:center;margin-top:2px;}
+  .bottle{overflow:visible;}
+  #liquid{transition:y .9s linear, height .9s linear, fill .4s;}
+  #liquidTop{transition:y .9s linear, opacity .4s;}
+  .bottle .cap{fill:#2c2c33;}
+  .bottle .outline{fill:none;stroke:#3a3a45;stroke-width:3;}
+  @keyframes ctaPulse{0%,100%{box-shadow:0 6px 18px rgba(38,198,218,.25);}50%{box-shadow:0 6px 26px rgba(38,198,218,.6);}}
+  .bigbtn.start-cta{animation:ctaPulse 1.8s ease-in-out infinite;}
 
   /* 步骤卡片 */
   .step{
@@ -187,16 +191,30 @@
     </div>
     <div class="cd-time" id="cdTime">--<small>分</small></div>
     <div class="cd-sub" id="cdSub">—</div>
-    <div class="ring-wrap">
-      <svg class="ring" width="120" height="120" viewBox="0 0 120 120">
-        <circle class="bg" cx="60" cy="60" r="52"></circle>
-        <circle class="fg" id="ringFg" cx="60" cy="60" r="52"></circle>
+    <div class="bottle-wrap">
+      <svg class="bottle" id="bottle" width="120" height="180" viewBox="0 0 120 180">
+        <defs>
+          <clipPath id="bottleClip">
+            <rect x="30" y="32" width="60" height="132" rx="18"/>
+            <rect x="53" y="16" width="14" height="20"/>
+          </clipPath>
+        </defs>
+        <!-- 液体（裁剪到瓶内，液面随进度下降） -->
+        <g clip-path="url(#bottleClip)">
+          <rect id="liquid" x="26" y="164" width="68" height="0" fill="#26c6da"/>
+          <rect id="liquidTop" x="26" y="160" width="68" height="6" fill="#b2ebf2" opacity="0.5"/>
+        </g>
+        <!-- 瓶身描边 -->
+        <rect class="outline" x="30" y="32" width="60" height="132" rx="18"/>
+        <rect class="outline" x="53" y="16" width="14" height="20"/>
+        <!-- 瓶盖 -->
+        <rect class="cap" x="49" y="6" width="22" height="12" rx="3"/>
       </svg>
     </div>
   </div>
 
   <!-- 步骤一 -->
-  <section class="step" id="step1">
+  <section class="step active" id="step1">
     <h2><span class="num">1</span>换药打卡<span class="done-tag">✓ 已记录</span></h2>
     <button class="bigbtn" id="resetBtn">刚刚换药了</button>
     <div class="hint" id="resetHint">点击记录本次换药的起始时间 T₀</div>
@@ -278,8 +296,7 @@
   "use strict";
   const $ = (id)=>document.getElementById(id);
   const STORE = "dripguard_state_v1";
-  const RING_R = 52, RING_C = 2*Math.PI*RING_R;
-  $("ringFg").style.strokeDasharray = RING_C;
+  const BOTTLE_BOTTOM = 164, BOTTLE_TOP = 16, BOTTLE_INNER = BOTTLE_BOTTOM - BOTTLE_TOP;
 
   // ---------- 状态 ----------
   let state = {
@@ -313,11 +330,15 @@
   // ---------- 步骤可见性 ----------
   function refreshSteps(){
     const s1=$("step1"), s2=$("step2"), s3=$("step3"), s4=$("step4"), s5=$("step5");
-    if(state.T0){ s1.classList.add("active","finished"); $("resetHint").textContent="已记下换药时间："+fmtClock(state.T0); }
+    s1.classList.add("active");                                  // 第一步始终高亮（开始计时入口）
+    if(state.T0){ s1.classList.add("finished"); $("resetHint").textContent="已记下换药时间："+fmtClock(state.T0); }
     if(state.T0){ s2.classList.add("active"); }
     if(state.T0){ s3.classList.add("active"); }
     if(state.R){ s4.classList.add("active","finished"); s5.classList.add("active"); $("reTapBtn").style.display=""; }
     if(state.Tend){ $("card").classList.add("show"); }
+    // 开始计时按钮在尚未换药时持续高亮脉冲
+    if(!state.T0){ $("resetBtn").classList.add("start-cta"); }
+    else { $("resetBtn").classList.remove("start-cta"); }
   }
 
   function fmtClock(ts){ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
@@ -435,7 +456,7 @@
       $("cdTime").innerHTML = "0<small>分</small>";
       $("cdSub").textContent = "输液应已滴完，请及时查看 / 换药。";
       statusEl.textContent="已滴完"; statusEl.className="cd-status done";
-      setRing(1);
+      setBottle(1);
       if(!state._finalDone){ state._finalDone=true; ring(); vibrate([200,100,200,100,200]); toast("滴完啦！请查看输液情况"); }
       return;
     }
@@ -445,7 +466,7 @@
     $("cdEnd").textContent = fmtClock(state.Tend);
     const totalMs = state.Tend - state.T0;
     const prog = totalMs>0 ? Math.min(1, (now-state.T0)/totalMs) : 0;
-    setRing(prog);
+    setBottle(prog);
     // 提前提醒
     if(!state.leadAlerted && remainMs <= state.leadMin*60000){
       state.leadAlerted=true; save();
@@ -456,10 +477,20 @@
       statusEl.textContent="滴液中"; statusEl.className="cd-status";
     }
   }
-  function setRing(p){
-    $("ringFg").style.strokeDashoffset = RING_C*(1-p);
-    const ring=$("ringFg");
-    ring.style.stroke = (p>0.85)? "var(--warn)" : (p>=1? "var(--ok)":"var(--accent)");
+  function setBottle(p){
+    const fillH = BOTTLE_INNER*(1-p);
+    const y = BOTTLE_BOTTOM - fillH;
+    const liq=$("liquid");
+    liq.style.y = y+"px"; liq.setAttribute("y", y);
+    liq.style.height = fillH+"px"; liq.setAttribute("height", fillH);
+    const top2=$("liquidTop");
+    const ty = Math.max(BOTTLE_TOP, y-3);
+    top2.style.y = ty+"px"; top2.setAttribute("y", ty);
+    top2.style.opacity = fillH>2 ? "0.55" : "0";
+    let col = "var(--accent)";
+    if(p>=1) col="var(--ok)";
+    else if(p>0.85) col="var(--warn)";
+    liq.style.fill = col;
   }
   setInterval(tick, 1000);
 
@@ -519,7 +550,7 @@
     $("card").classList.remove("show"); $("resetHint").textContent="点击记录本次换药的起始时间 T₀";
     $("tapRes").textContent="尚未采样"; $("calcRes").textContent="完成上方采样后自动推算。"; $("reTapBtn").style.display="none";
     stopKeepAlive(); $("keepAlive").checked=false; state.keepAlive=false;
-    save();
+    save(); refreshSteps();
   });
 
   // ---------- 启动 ----------
