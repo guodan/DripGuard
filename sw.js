@@ -1,7 +1,7 @@
 /* 滴速守卫 Drip Guard — Service Worker
  * 在线时网络优先（保证始终拿到最新文件），离线/弱网时回退缓存，保证秒开
  */
-const CACHE = "dripguard-v2";
+const CACHE = "dripguard-v3";
 const ASSETS = [
   "./",
   "./index.html",

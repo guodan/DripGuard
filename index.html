@@ -57,7 +57,15 @@
     margin-bottom:20px;
   }
   .countdown.show{display:block;}
+  /* 设置阶段：收起为紧凑条（隐藏大瓶、显示细进度条，给下方交互区让出空间） */
+  .countdown.compact{padding:10px 14px;}
+  .countdown.compact .bottle-wrap{display:none;}
+  .countdown.compact .cd-time{font-size:30px;margin:6px 0 2px;}
+  .countdown.compact .cd-sub{margin-bottom:8px;}
+  .countdown.compact .cd-bar{display:block;}
+  .countdown.compact .retap-sticky{display:none !important;}
   .cd-top{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .cd-r{display:flex;align-items:center;gap:8px;}
   .cd-end{font-size:13px;color:var(--txt-dim);}
   .cd-end b{color:var(--accent-soft);font-size:18px;font-weight:700;letter-spacing:1px;}
   .cd-status{font-size:12px;color:var(--txt-dim);text-align:right;max-width:50%;}
@@ -66,6 +74,12 @@
   .cd-time{font-size:46px;font-weight:800;letter-spacing:1px;text-align:center;margin:10px 0 4px;font-variant-numeric:tabular-nums;}
   .cd-time small{font-size:18px;font-weight:600;color:var(--txt-dim);margin-left:4px;}
   .cd-sub{text-align:center;color:var(--txt-dim);font-size:13px;margin-bottom:12px;}
+  .cd-bar{display:none;height:6px;border-radius:999px;background:#2c2c33;overflow:hidden;margin:2px 0 4px;}
+  .cd-bar-fill{height:100%;width:100%;background:var(--accent);transition:width .9s linear, background .4s;}
+  .cd-toggle{background:var(--bg-soft);color:var(--txt-dim);border:1px solid var(--line);border-radius:8px;font-size:12px;padding:3px 9px;cursor:pointer;flex:0 0 auto;}
+  .cd-toggle:active{transform:scale(.95);}
+  .retap-sticky{display:none;margin:12px auto 0;background:var(--bg-soft);color:var(--txt);border:1px solid var(--line);border-radius:12px;padding:11px 18px;font-size:14px;cursor:pointer;width:100%;max-width:260px;}
+  .retap-sticky:active{transform:scale(.98);}
   .bottle-wrap{display:flex;justify-content:center;margin-top:2px;}
   .bottle{overflow:visible;}
   /* 液面用 transform 缩放/平移，全平台（含 iOS Safari）均可平滑动画 */
@@ -74,6 +88,12 @@
   .bottle .cap{fill:#2c2c33;}
   .bottle .outline{fill:none;stroke:#3a3a45;stroke-width:3;}
   .bottle .neck{fill:none;stroke:#3a3a45;stroke-width:3;}
+  /* 步骤一内的小型内联瓶子（换药即在此就地填充，设置阶段可见，倒计时阶段隐藏） */
+  .mini-bottle-wrap{display:none;justify-content:center;margin-top:14px;}
+  .mini-bottle-wrap.show{display:flex;}
+  .mini-bottle{overflow:visible;}
+  #liquidS{transform-box:fill-box;transform-origin:50% 100%;transition:transform .9s linear, fill .4s;}
+  #liquidTopS{transform-box:fill-box;transform-origin:50% 100%;transition:transform .9s linear, opacity .4s;}
   @keyframes ctaPulse{0%,100%{box-shadow:0 6px 18px rgba(38,198,218,.25);}50%{box-shadow:0 6px 26px rgba(38,198,218,.6);}}
   .bigbtn.start-cta{animation:ctaPulse 1.8s ease-in-out infinite;}
 
@@ -189,10 +209,14 @@
   <div class="countdown" id="card">
     <div class="cd-top">
       <div class="cd-end">预计 <b id="cdEnd">--:--</b> 滴完</div>
-      <div class="cd-status" id="cdStatus">计算中…</div>
+      <div class="cd-r">
+        <div class="cd-status" id="cdStatus">计算中…</div>
+        <button class="cd-toggle" id="cdToggle" type="button" title="展开 / 收起瓶子">▾ 瓶子</button>
+      </div>
     </div>
     <div class="cd-time" id="cdTime">--<small>分</small></div>
     <div class="cd-sub" id="cdSub">—</div>
+    <div class="cd-bar" id="cdBar"><div class="cd-bar-fill" id="cdBarFill"></div></div>
     <div class="bottle-wrap">
       <svg class="bottle" id="bottle" width="120" height="190" viewBox="0 0 120 190">
         <defs>
@@ -214,6 +238,7 @@
         <circle cx="60" cy="184" r="3" fill="#26c6da"/>
       </svg>
     </div>
+    <button class="retap-sticky" id="reTapSticky" type="button" style="display:none;">重新测速（再敲 5 下）</button>
   </div>
 
   <!-- 步骤一 -->
@@ -221,6 +246,24 @@
     <h2><span class="num">1</span>换药打卡<span class="done-tag">✓ 已记录</span></h2>
     <button class="bigbtn" id="resetBtn">刚刚换药了</button>
     <div class="hint" id="resetHint">点击记录本次换药的起始时间 T₀</div>
+    <div class="mini-bottle-wrap" id="step1Bottle">
+      <svg class="mini-bottle" width="72" height="114" viewBox="0 0 72 114">
+        <defs>
+          <clipPath id="bottleClipS">
+            <rect x="18" y="12" width="36" height="78" rx="13"/>
+            <rect x="31.8" y="87.6" width="8.4" height="13.2"/>
+          </clipPath>
+        </defs>
+        <g clip-path="url(#bottleClipS)">
+          <rect id="liquidS" x="15.6" y="12" width="40.8" height="88.8" fill="#26c6da"/>
+          <rect id="liquidTopS" x="15.6" y="12" width="40.8" height="3" fill="#b2ebf2" opacity="0"/>
+        </g>
+        <rect class="outline" x="18" y="12" width="36" height="78" rx="13"/>
+        <rect class="neck" x="31.8" y="87.6" width="8.4" height="13.2"/>
+        <rect class="cap" x="29.4" y="99.6" width="13.2" height="8.4" rx="1.8"/>
+        <circle cx="36" cy="110.4" r="1.8" fill="#26c6da"/>
+      </svg>
+    </div>
   </section>
 
   <!-- 步骤二 -->
@@ -300,6 +343,8 @@
   const $ = (id)=>document.getElementById(id);
   const STORE = "dripguard_state_v1";
   const BOTTLE_TRAVEL = 148; // 液面可移动的总距离（满→空，单位:SVG用户坐标）
+  const BOTTLE_TRAVEL_S = 88.8; // 小瓶（步骤一内）对应距离
+  let cardCollapsed = false; // 倒计时态下用户是否手动收起大瓶
 
   // ---------- 状态 ----------
   let state = {
@@ -338,8 +383,17 @@
     if(state.T0){ s2.classList.add("active"); }
     if(state.T0){ s3.classList.add("active"); }
     if(state.R){ s4.classList.add("active","finished"); s5.classList.add("active"); $("reTapBtn").style.display=""; }
-    if(state.T0){ $("card").classList.add("show"); }                  // 一换药即显示瓶子（满瓶）
-    if(state.T0 && !state.Tend){                                      // 测算中：瓶子满，等待节拍与容量
+    if(state.T0){ $("card").classList.add("show"); }
+    if(state.Tend){
+      // 倒计时态：默认展开大瓶；若用户手动收起则保持紧凑（仅影响大瓶，细进度条仍可见）
+      $("card").classList.toggle("compact", cardCollapsed);
+      $("step1Bottle").classList.remove("show");
+      $("reTapSticky").style.display = state.R ? "" : "none";
+    } else if(state.T0){
+      // 设置态：吸顶卡收为紧凑条（隐藏大瓶，给下方液量/节拍交互区让出空间）+ 步骤一内小瓶就地显示
+      $("card").classList.add("compact");
+      $("step1Bottle").classList.add("show");
+      $("reTapSticky").style.display="none";
       $("cdTime").innerHTML="测算中";
       $("cdSub").textContent="轻敲屏幕测滴速，并选好液量";
       $("cdEnd").textContent="—";
@@ -436,7 +490,18 @@
     setTimeout(()=>r.remove(),650);
   }
   $("tapZone").addEventListener("pointerdown",(e)=>{ e.preventDefault(); handleTap(e.clientX,e.clientY); });
-  $("reTapBtn").addEventListener("click",()=>{ tapTimestamps=[]; updateTapUI(); $("tapRes").textContent="请重新轻敲 5 下"; state.R=null; state.Tend=null; state.leadAlerted=false; save(); refreshSteps(); });
+  $("reTapBtn").addEventListener("click",()=>{ tapTimestamps=[]; updateTapUI(); $("tapRes").textContent="请重新轻敲 5 下"; state.R=null; state.Tend=null; state.leadAlerted=false; cardCollapsed=false; save(); refreshSteps(); });
+  // 倒计时态的“重新测速”入口（独立于敲拍区，刻意错开避免误触；点击后平滑滚动到节拍区）
+  $("reTapSticky").addEventListener("click",()=>{
+    tapTimestamps=[]; updateTapUI(); $("tapRes").textContent="请重新轻敲 5 下"; state.R=null; state.Tend=null; state.leadAlerted=false; cardCollapsed=false; save(); refreshSteps();
+    setTimeout(()=>$("step3").scrollIntoView({behavior:"smooth", block:"center"}), 60);
+  });
+  // 吸顶卡“▾ 瓶子”收起/展开（仅倒计时态有效；设置态始终紧凑）
+  $("cdToggle").addEventListener("click",()=>{
+    if(!state.Tend) return;
+    cardCollapsed = !cardCollapsed;
+    $("card").classList.toggle("compact", cardCollapsed);
+  });
 
   // ---------- 推算 ----------
   function recompute(){
@@ -498,21 +563,39 @@
   function setBottle(p){
     p = Math.max(0, Math.min(1, p));
     const fillRatio = 1 - p;            // 1=满, 0=空
-    const liq=$("liquid");
-    // 缩放底部锚定的液面：满时 scaleY(1) 充满，空时 scaleY(0) 收到底部出口
-    liq.style.transform = "scaleY("+fillRatio+")";
-    liq.style.fill = p>=1 ? "var(--ok)" : (p>0.85 ? "var(--warn)" : "var(--accent)");
-    // 液面高亮随液面同步下移
-    const top2=$("liquidTop");
-    top2.style.transform = "translateY("+(p*BOTTLE_TRAVEL)+"px)";
-    top2.style.opacity = fillRatio>0.02 ? "0.6" : "0";
+    const col = p>=1 ? "var(--ok)" : (p>0.85 ? "var(--warn)" : "var(--accent)");
+    // 大瓶（吸顶卡，倒计时态可见）
+    const liq=$("liquid"), top2=$("liquidTop");
+    if(liq){
+      liq.style.transform = "scaleY("+fillRatio+")";
+      liq.style.fill = col;
+    }
+    if(top2){
+      top2.style.transform = "translateY("+(p*BOTTLE_TRAVEL)+"px)";
+      top2.style.opacity = fillRatio>0.02 ? "0.6" : "0";
+    }
+    // 小瓶（步骤一内，设置态可见）
+    const liqS=$("liquidS"), topS=$("liquidTopS");
+    if(liqS){
+      liqS.style.transform = "scaleY("+fillRatio+")";
+      liqS.style.fill = col;
+    }
+    if(topS){
+      topS.style.transform = "translateY("+(p*BOTTLE_TRAVEL_S)+"px)";
+      topS.style.opacity = fillRatio>0.02 ? "0.6" : "0";
+    }
+    // 紧凑进度条（剩余液位，与瓶一致）
+    const bar=$("cdBarFill");
+    if(bar){ bar.style.width=(fillRatio*100)+"%"; bar.style.background=col; }
   }
   function fillBottle(){              // 刚换药：瓶子自底向上充满（仅用户点击时播放动画）
-    const liq=$("liquid");
-    liq.style.transition="none";
-    liq.style.transform="scaleY(0)";
-    void liq.getBoundingClientRect(); // 强制回流，使下一帧从空开始
-    liq.style.transition="";          // 恢复 CSS .9s 过渡
+    [$("liquid"),$("liquidS")].forEach(liq=>{
+      if(!liq) return;
+      liq.style.transition="none";
+      liq.style.transform="scaleY(0)";
+      void liq.getBoundingClientRect(); // 强制回流，使下一帧从空开始
+      liq.style.transition="";          // 恢复 CSS .9s 过渡
+    });
     setBottle(0);                     // → scaleY(1) 触发填充动画
   }
   setInterval(tick, 1000);
